@@ -307,8 +307,8 @@
             log(`=== BẮT ĐẦU GỬI ĐƠN THUỐC (${queue.length} loại) ===`);
 
             for (let item of queue) {
-                // Chuỗi đơn giản: "TT,2" hoặc "LHQ,1" hoặc "DT,3"
-                let msg = `${item.code},${item.qty}`;
+                // ĐỊNH DẠNG DÙNG DẤU CÁCH: "TT 2", "LHQ 1", "DT 3" để EV3 Classroom split dễ dàng
+                let msg = `${item.code} ${item.qty}`;
                 log(`Đang gửi: ${item.name} - Số lượng: ${item.qty} (Lệnh: "${msg}")`);
 
                 if (gattServer && gattServer.connected && rxCharacteristic) {
@@ -320,10 +320,10 @@
                         log(`Lỗi phát tín hiệu: ${e.message}`);
                     }
                 } else {
-                    log(`[Chế độ Mô Phỏng] Đã phát lệnh: ${msg}`);
+                    log(`[Mô Phỏng] Đã phát lệnh: "${msg}"`);
                 }
 
-                // Chờ EV3 nhả thuốc xong trong khoảng (Số_lượng * 1.5s + 1s trễ)
+                // Chờ EV3 nhả thuốc xong (mỗi viên chờ 1.5s + 1s trễ cố định) rồi mới gửi loại tiếp
                 let waitTime = (item.qty * 1500) + 1000;
                 await sleep(waitTime);
             }
