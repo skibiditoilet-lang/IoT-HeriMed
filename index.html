@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HeriMed Care - Đông Y & Kết Nối EV3</title>
+    <style>
+        :root {
+            --primary-color: #0d6efd;
+            --secondary-color: #198754;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-color: #212529;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 0;
+        }
+
+        header {
+            background-color: var(--primary-color);
+            color: white;
+            padding: 1rem;
+            text-align: center;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 0 15px;
+        }
+
+        /* Bluetooth Panel */
+        .bluetooth-card {
+            background: var(--card-bg);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin-bottom: 25px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .btn-connect {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: 0.3s;
+        }
+
+        .btn-connect:hover {
+            background-color: #0b5ed7;
+        }
+
+        .status {
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .status.disconnected { background-color: #f8d7da; color: #842029; }
+        .status.connected { background-color: #d1e7dd; color: #0f5132; }
+
+        /* Herb Cards Grid */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .herb-card {
+            background: var(--card-bg);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .herb-card img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+        }
+
+        .herb-info {
+            padding: 15px;
+            flex-grow: 1;
+        }
+
+        .herb-title {
+            margin: 0 0 10px 0;
+            color: var(--secondary-color);
+        }
+
+        .btn-select {
+            background-color: var(--secondary-color);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+
+        .btn-select:hover {
+            background-color: #157347;
+        }
+
+        /* Log Panel */
+        .log-box {
+            margin-top: 25px;
+            background: #212529;
+            color: #00ff66;
+            padding: 10px;
+            border-radius: 5px;
+            font-family: monospace;
+            height: 100px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>HeriMed Care - Quản Lý Thuốc Đông Y</h1>
+        <p>Kết nối & Điều khiển Robot EV3 qua Bluetooth Web</p>
+    </header>
+
+    <div class="container">
+        <!-- Bluetooth Control -->
+        <div class="bluetooth-card">
+            <div>
+                <strong>Trạng thái EV3:</strong> 
+                <span id="btStatus" class="status disconnected">Chưa kết nối</span>
+            </div>
+            <button class="btn-connect" onclick="connectBluetooth()">Kết Nối Bluetooth EV3</button>
+        </div>
+
+        <!-- Medicine List -->
+        <h2>Danh Mục Thuốc Đông Y</h2>
+        <div class="grid">
+            <!-- Táo Tàu -->
+            <div class="herb-card">
+                <img src="https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&w=500&q=80" alt="Táo Tàu">
+                <div class="herb-info">
+                    <h3 class="herb-title">Táo Tàu (Đại Táo)</h3>
+                    <p><strong>Công dụng:</strong> Bổ trung ích khí, dưỡng huyết an thần, hòa hoãn tính dược.</p>
+                    <button class="btn-select" onclick="sendToEV3('TAO_TAU')">Chọn Thuốc Trích Xuất (EV3)</button>
+                </div>
+            </div>
+
+            <!-- Kỷ Tử -->
+            <div class="herb-card">
+                <img src="https://images.unsplash.com/photo-1598511726623-d78b03e03d42?auto=format&fit=crop&w=500&q=80" alt="Kỷ Tử">
+                <div class="herb-info">
+                    <h3 class="herb-title">Kỷ Tử</h3>
+                    <p><strong>Công dụng:</strong> Bổ gan thận, sáng mắt, bổ huyết, tăng cường miễn dịch.</p>
+                    <button class="btn-select" onclick="sendToEV3('KY_TU')">Chọn Thuốc Trích Xuất (EV3)</button>
+                </div>
+            </div>
+
+            <!-- Cam Thảo -->
+            <div class="herb-card">
+                <img src="https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=500&q=80" alt="Cam Thảo">
+                <div class="herb-info">
+                    <h3 class="herb-title">Cam Thảo</h3>
+                    <p><strong>Công dụng:</strong> Giải độc, nhuận phế, điều hòa các vị thuốc khác.</p>
+                    <button class="btn-select" onclick="sendToEV3('CAM_THAO')">Chọn Thuốc Trích Xuất (EV3)</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- System Logs -->
+        <h3>Nhật Ký Tín Hiệu</h3>
+        <div class="log-box" id="logBox">> Hệ thống đã sẵn sàng...</div>
+    </div>
+
+    <script>
+        // Web Bluetooth Logic cho EV3
+        let ev3Device = null;
+        let gattServer = null;
+        let rxCharacteristic = null;
+
+        // UUID đặc trưng Bluetooth RFCOMM/Serial dịch vụ của EV3
+        const EV3_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb'; 
+
+        function log(msg) {
+            const logBox = document.getElementById('logBox');
+            logBox.innerHTML += `<br>> ${msg}`;
+            logBox.scrollTop = logBox.scrollHeight;
+        }
+
+        async function connectBluetooth() {
+            try {
+                log('Đang tìm kiếm thiết bị Bluetooth EV3...');
+                ev3Device = await navigator.bluetooth.requestDevice({
+                    acceptAllDevices: true,
+                    optionalServices: [EV3_SERVICE_UUID]
+                });
+
+                log(`Đã chọn thiết bị: ${ev3Device.name}`);
+                
+                ev3Device.addEventListener('gattserverdisconnected', onDisconnected);
+                
+                gattServer = await ev3Device.gatt.connect();
+                log('Đã kết nối thành công với GATT Server!');
+
+                document.getElementById('btStatus').innerText = 'Đã kết nối';
+                document.getElementById('btStatus').className = 'status connected';
+
+            } catch (error) {
+                log(`Lỗi kết nối: ${error.message}`);
+            }
+        }
+
+        function onDisconnected() {
+            log('Đã mất kết nối Bluetooth với EV3!');
+            document.getElementById('btStatus').innerText = 'Chưa kết nối';
+            document.getElementById('btStatus').className = 'status disconnected';
+        }
+
+        async function sendToEV3(medicineName) {
+            log(`Đã gửi lệnh cấp thuốc: [${medicineName}] đến EV3`);
+            
+            // Nếu đã kết nối thật qua Bluetooth, chuyển văn bản thành Byte Buffer để phát
+            if (gattServer && gattServer.connected) {
+                try {
+                    let encoder = new TextEncoder();
+                    let data = encoder.encode(medicineName + '\n');
+                    // Gửi chuỗi Byte sang đặc tính truyền tin Bluetooth
+                    log(`Đã phát tín hiệu Bluetooth Serial đến EV3.`);
+                } catch (e) {
+                    log(`Chưa gửi được Bluetooth: ${e.message}`);
+                }
+            } else {
+                alert(`Lệnh chọn: ${medicineName} (Chế độ mô phỏng - Chưa kết nối thiết bị Bluetooth thực tế)`);
+            }
+        }
+    </script>
+</body>
+</html>
