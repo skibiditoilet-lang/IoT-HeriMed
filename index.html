@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HeriMed Io - Hệ thống IoT nhập và lấy thuốc</title>
+    <title>HeriMed Care - Đông Y & Kết Nối EV3</title>
     <style>
         :root {
             --primary-color: #0d6efd;
@@ -30,16 +30,8 @@
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
 
-        header h1 {
-            margin: 0;
-            font-size: 1.5rem;
-        }
-
-        header p {
-            margin: 5px 0 0 0;
-            font-size: 0.9rem;
-            opacity: 0.9;
-        }
+        header h1 { margin: 0; font-size: 1.5rem; }
+        header p { margin: 5px 0 0 0; font-size: 0.9rem; opacity: 0.9; }
 
         .container {
             max-width: 800px;
@@ -47,7 +39,6 @@
             padding: 0 15px;
         }
 
-        /* Bluetooth Panel */
         .bluetooth-card {
             background: var(--card-bg);
             padding: 15px 20px;
@@ -73,9 +64,7 @@
             transition: 0.2s;
         }
 
-        .btn-connect:hover {
-            background-color: #0b5ed7;
-        }
+        .btn-connect:hover { background-color: #0b5ed7; }
 
         .status {
             font-weight: bold;
@@ -86,7 +75,6 @@
         .status.disconnected { background-color: #f8d7da; color: #842029; }
         .status.connected { background-color: #d1e7dd; color: #0f5132; }
 
-        /* Herb List */
         .herb-list {
             display: flex;
             flex-direction: column;
@@ -106,24 +94,10 @@
             gap: 15px;
         }
 
-        .herb-info {
-            flex: 1;
-            min-width: 220px;
-        }
+        .herb-info { flex: 1; min-width: 220px; }
+        .herb-title { margin: 0 0 6px 0; color: var(--secondary-color); font-size: 1.2rem; }
+        .herb-desc { margin: 0; font-size: 0.9rem; color: #6c757d; }
 
-        .herb-title {
-            margin: 0 0 6px 0;
-            color: var(--secondary-color);
-            font-size: 1.2rem;
-        }
-
-        .herb-desc {
-            margin: 0;
-            font-size: 0.9rem;
-            color: #6c757d;
-        }
-
-        /* Quantity Control */
         .quantity-control {
             display: flex;
             align-items: center;
@@ -146,11 +120,6 @@
             align-items: center;
             justify-content: center;
             user-select: none;
-            transition: 0.1s;
-        }
-
-        .btn-qty:active {
-            background-color: #e9ecef;
         }
 
         .qty-input {
@@ -162,10 +131,7 @@
             background: transparent;
         }
 
-        /* Submit Action */
-        .action-panel {
-            margin-top: 25px;
-        }
+        .action-panel { margin-top: 25px; }
 
         .btn-send-all {
             background-color: var(--secondary-color);
@@ -181,11 +147,8 @@
             transition: 0.2s;
         }
 
-        .btn-send-all:hover {
-            background-color: #157347;
-        }
+        .btn-send-all:hover { background-color: #157347; }
 
-        /* Log Panel */
         .log-box {
             margin-top: 25px;
             background: #212529;
@@ -194,7 +157,7 @@
             border-radius: 8px;
             font-family: 'Courier New', Courier, monospace;
             font-size: 0.85rem;
-            height: 120px;
+            height: 140px;
             overflow-y: auto;
         }
     </style>
@@ -207,7 +170,7 @@
     </header>
 
     <div class="container">
-        <!-- Bluetooth Control -->
+        <!-- Panel Bluetooth -->
         <div class="bluetooth-card">
             <div>
                 <strong>Trạng thái EV3:</strong> 
@@ -216,7 +179,7 @@
             <button class="btn-connect" onclick="connectBluetooth()">Kết Nối Bluetooth EV3</button>
         </div>
 
-        <!-- Medicine Selection List -->
+        <!-- Danh sách chọn thuốc -->
         <h2>Chọn Số Lượng Thuốc</h2>
         <div class="herb-list">
             
@@ -261,12 +224,12 @@
 
         </div>
 
-        <!-- Submit Button -->
+        <!-- Nút gửi lệnh -->
         <div class="action-panel">
             <button class="btn-send-all" onclick="sendOrderToEV3()">Gửi Đơn Thuốc Sang EV3</button>
         </div>
 
-        <!-- System Logs -->
+        <!-- Nhật ký -->
         <h3>Nhật Ký Truyền Nhận</h3>
         <div class="log-box" id="logBox">> Hệ thống HeriMed Care sẵn sàng...</div>
     </div>
@@ -274,8 +237,11 @@
     <script>
         let ev3Device = null;
         let gattServer = null;
+        let rxCharacteristic = null;
 
+        // UUID dịch vụ Serial Port của EV3
         const EV3_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb'; 
+        const EV3_CHAR_UUID    = '00001101-0000-1000-8000-00805f9b34fb';
 
         function log(msg) {
             const logBox = document.getElementById('logBox');
@@ -283,7 +249,6 @@
             logBox.scrollTop = logBox.scrollHeight;
         }
 
-        // Tăng giảm số lượng thuốc
         function changeQty(id, delta) {
             const input = document.getElementById(id);
             let currentVal = parseInt(input.value) || 0;
@@ -292,7 +257,6 @@
             input.value = newVal;
         }
 
-        // Kết nối Bluetooth Web
         async function connectBluetooth() {
             try {
                 log('Đang tìm kiếm thiết bị EV3...');
@@ -301,12 +265,14 @@
                     optionalServices: [EV3_SERVICE_UUID]
                 });
 
-                log(`Đã chọn thiết bị: ${ev3Device.name}`);
+                log(`Đã chọn: ${ev3Device.name}`);
                 ev3Device.addEventListener('gattserverdisconnected', onDisconnected);
                 
                 gattServer = await ev3Device.gatt.connect();
-                log('Đã kết nối thành công với GATT Server của EV3!');
+                const service = await gattServer.getPrimaryService(EV3_SERVICE_UUID);
+                rxCharacteristic = await service.getCharacteristic(EV3_CHAR_UUID);
 
+                log('Kết nối thành công Bluetooth EV3!');
                 document.getElementById('btStatus').innerText = 'Đã kết nối';
                 document.getElementById('btStatus').className = 'status connected';
 
@@ -321,7 +287,8 @@
             document.getElementById('btStatus').className = 'status disconnected';
         }
 
-        // Gom đơn thuốc và gửi sang EV3
+        const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         async function sendOrderToEV3() {
             const taoTau = parseInt(document.getElementById('taoTau').value) || 0;
             const laHanQua = parseInt(document.getElementById('laHanQua').value) || 0;
@@ -332,22 +299,36 @@
                 return;
             }
 
-            // Tạo chuỗi định dạng gửi đi, ví dụ: "TT:2|LHQ:1|DT:3"
-            const commandPayload = `TT:${taoTau}|LHQ:${laHanQua}|DT:${daiTao}`;
+            let queue = [];
+            if (taoTau > 0) queue.push({ code: 'TT', qty: taoTau, name: 'Táo Tàu' });
+            if (laHanQua > 0) queue.push({ code: 'LHQ', qty: laHanQua, name: 'La Hán Quả' });
+            if (daiTao > 0) queue.push({ code: 'DT', qty: daiTao, name: 'Đại Táo' });
 
-            log(`Đang gửi chuỗi đơn thuốc: [${commandPayload}]`);
+            log(`=== BẮT ĐẦU GỬI ĐƠN THUỐC (${queue.length} loại) ===`);
 
-            if (gattServer && gattServer.connected) {
-                try {
-                    let encoder = new TextEncoder();
-                    let data = encoder.encode(commandPayload + '\n');
-                    log(`-> Đã phát tín hiệu Bluetooth sang EV3.`);
-                } catch (e) {
-                    log(`Lỗi khi truyền dữ liệu: ${e.message}`);
+            for (let item of queue) {
+                // Chuỗi đơn giản: "TT,2" hoặc "LHQ,1" hoặc "DT,3"
+                let msg = `${item.code},${item.qty}`;
+                log(`Đang gửi: ${item.name} - Số lượng: ${item.qty} (Lệnh: "${msg}")`);
+
+                if (gattServer && gattServer.connected && rxCharacteristic) {
+                    try {
+                        let encoder = new TextEncoder();
+                        let data = encoder.encode(msg + '\n');
+                        await rxCharacteristic.writeValue(data);
+                    } catch (e) {
+                        log(`Lỗi phát tín hiệu: ${e.message}`);
+                    }
+                } else {
+                    log(`[Chế độ Mô Phỏng] Đã phát lệnh: ${msg}`);
                 }
-            } else {
-                alert(`Chế độ mô phỏng (Chưa kết nối EV3 thực tế):\nĐã gửi gói lệnh: ${commandPayload}`);
+
+                // Chờ EV3 nhả thuốc xong trong khoảng (Số_lượng * 1.5s + 1s trễ)
+                let waitTime = (item.qty * 1500) + 1000;
+                await sleep(waitTime);
             }
+
+            log(`=== HOÀN THÀNH ĐƠN THUỐC ===`);
         }
     </script>
 </body>
