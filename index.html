@@ -8,6 +8,7 @@
         :root {
             --primary-color: #0d6efd;
             --secondary-color: #198754;
+            --reset-color: #dc3545;
             --bg-color: #f8f9fa;
             --card-bg: #ffffff;
             --text-color: #212529;
@@ -151,13 +152,19 @@
             background: transparent;
         }
 
-        .action-panel { margin-top: 25px; }
+        .action-panel { 
+            margin-top: 25px; 
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
 
         .btn-send-all {
             background-color: var(--secondary-color);
             color: white;
             border: none;
-            width: 100%;
+            flex: 2;
+            min-width: 200px;
             padding: 14px;
             border-radius: 8px;
             font-size: 1.05rem;
@@ -169,6 +176,23 @@
 
         .btn-send-all:hover { background-color: #157347; }
         .btn-send-all:disabled { background-color: #6c757d; cursor: not-allowed; }
+
+        .btn-reset {
+            background-color: var(--reset-color);
+            color: white;
+            border: none;
+            flex: 1;
+            min-width: 130px;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1.05rem;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 3px 6px rgba(220, 53, 69, 0.2);
+            transition: 0.2s;
+        }
+
+        .btn-reset:hover { background-color: #bb2d3b; }
 
         .log-box {
             margin-top: 25px;
@@ -245,9 +269,10 @@
 
         </div>
 
-        <!-- Nút gửi lệnh -->
+        <!-- Panel Nút điều khiển -->
         <div class="action-panel">
             <button class="btn-send-all" id="btnSend" onclick="sendOrderToEV3()">Bắt Đầu Cho Băng Chuyền Chạy</button>
+            <button class="btn-reset" onclick="resetSystem()">Reset / Làm Mới</button>
         </div>
 
         <!-- Nhật ký -->
@@ -261,7 +286,6 @@
         let rxCharacteristic = null;
         let isConnected = false;
 
-        // Biến Promise dùng để tạm dừng JS chờ tin nhắn "DONE" từ EV3
         let ev3DoneResolver = null;
 
         const EV3_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb'; 
@@ -280,6 +304,37 @@
             input.value = val;
         }
 
+        // HÀM RESET / LÀM MỚI HỆ THỐNG
+        function resetSystem() {
+            // 1. Reset các ô số lượng về 0
+            document.getElementById('taoTau').value = '0';
+            document.getElementById('laHanQua').value = '0';
+            document.getElementById('daiTao').value = '0';
+
+            // 2. Reset màu sắc và badge trạng thái của các Trạm
+            const codes = ['TT', 'LHQ', 'DT'];
+            codes.forEach(code => {
+                const item = document.getElementById(`item-${code}`);
+                const badge = document.getElementById(`badge-${code}`);
+                item.className = 'herb-item';
+                badge.innerText = 'Sẵn sàng';
+                badge.style.backgroundColor = '#e9ecef';
+                badge.style.color = '#495057';
+            });
+
+            // 3. Xóa sạch khung Nhật ký (Log)
+            document.getElementById('logBox').innerHTML = '> Đã reset hệ thống. Sẵn sàng...';
+
+            // 4. Mở lại nút gửi lệnh
+            document.getElementById('btnSend').disabled = false;
+
+            // 5. Giải phóng Promise đang chờ nếu có
+            if (ev3DoneResolver) {
+                ev3DoneResolver();
+                ev3DoneResolver = null;
+            }
+        }
+
         async function connectBluetooth() {
             try {
                 log('Đang tìm kiếm thiết bị EV3...');
@@ -295,7 +350,6 @@
                 const service = await gattServer.getPrimaryService(EV3_SERVICE_UUID);
                 rxCharacteristic = await service.getCharacteristic(EV3_CHAR_UUID);
 
-                // Lắng nghe dữ liệu EV3 gửi ngược lại Web
                 await rxCharacteristic.startNotifications();
                 rxCharacteristic.addEventListener('characteristicvaluechanged', handleEV3Response);
 
@@ -316,13 +370,11 @@
             document.getElementById('btStatus').className = 'status disconnected';
         }
 
-        // Xử lý khi nhận dữ liệu từ EV3 gửi về Web
         function handleEV3Response(event) {
             let decoder = new TextDecoder('utf-8');
             let response = decoder.decode(event.target.value).trim();
             log(`EV3 Phản hồi: "${response}"`);
 
-            // Nếu EV3 gửi chữ DONE, mở khóa cho Web chạy tiếp
             if (response.includes('DONE') && ev3DoneResolver) {
                 log('✔ Nhận tín hiệu DONE từ EV3. Chuyển trạm tiếp theo!');
                 ev3DoneResolver();
@@ -332,15 +384,12 @@
 
         const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-        // HÀM XỬ LÝ CHỜ ĐỜI TẠI MỖI TRẠM
         function waitForEV3Done(simTimeoutMs) {
             return new Promise((resolve) => {
                 if (isConnected) {
-                    // NẾU CÓ BLUETOOTH THẬT: Đứng chờ VÔ THỜI HẠN đến khi EV3 gửi chữ "DONE"
                     log('Đang đứng chờ robot EV3 trả về tín hiệu "DONE"...');
                     ev3DoneResolver = resolve;
                 } else {
-                    // NẾU CHẠY MÔ PHỎNG: Tự động đếm 1.5 giây/viên rồi chạy tiếp
                     log(`[Mô Phỏng] Đang chờ mô phỏng: ${simTimeoutMs / 1000} giây...`);
                     setTimeout(() => {
                         resolve();
@@ -377,13 +426,11 @@
             log(`=== BẮT ĐẦU CHẠY BĂNG CHUYỀN (${queue.length} Trạm) ===`);
 
             for (let item of queue) {
-                // 1. Cập nhật UI: Đang xả thuốc
                 updateStatusUI(item.code, `Đang xả thuốc (${item.qty} viên)...`, 'processing');
                 
                 let msg = `${item.code} ${item.qty}`;
                 log(`Gửi lệnh Trạm [${item.name}]: "${msg}"`);
 
-                // 2. Gửi lệnh Bluetooth tới EV3
                 if (isConnected && rxCharacteristic) {
                     try {
                         let encoder = new TextEncoder();
@@ -393,16 +440,13 @@
                     }
                 }
 
-                // 3. Tính thời gian đếm giờ mô phỏng (1.5s x số lượng)
                 let simTimeout = item.qty * 1500; 
 
-                // 4. CHỜ THỰC THI (Chờ "DONE" từ EV3 hoặc chờ 1.5s mô phỏng)
                 await waitForEV3Done(simTimeout);
 
-                // 5. Cập nhật UI: Đã lấy xong!
                 updateStatusUI(item.code, `Đã lấy xong (${item.qty} viên)`, 'completed');
                 
-                await sleep(500); // Trễ nhỏ 0.5s giữa các trạm
+                await sleep(500);
             }
 
             log(`=== HOÀN THÀNH TOÀN BỘ ĐƠN THUỐC ===`);
