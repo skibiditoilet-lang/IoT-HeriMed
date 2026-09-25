@@ -287,6 +287,8 @@
         let isConnected = false;
 
         let ev3DoneResolver = null;
+        let simTimer = null;         // Biến lưu Timer mô phỏng
+        let isCancelled = false;    // CỜ DỪNG TIẾN TRÌNH KHI BẤM RESET
 
         const EV3_SERVICE_UUID = '00001101-0000-1000-8000-00805f9b34fb'; 
         const EV3_CHAR_UUID    = '00001101-0000-1000-8000-00805f9b34fb';
@@ -304,14 +306,29 @@
             input.value = val;
         }
 
-        // HÀM RESET / LÀM MỚI HỆ THỐNG
+        // HÀM RESET HỆ THỐNG - ĐÃ SỬA TRIỆT ĐỂ LỖI CHẠY NGẦM
         function resetSystem() {
-            // 1. Reset các ô số lượng về 0
+            // 1. Đặt cờ hủy tiến trình ngay lập tức
+            isCancelled = true;
+
+            // 2. Xóa đếm giờ Mô Phỏng nếu đang chạy
+            if (simTimer) {
+                clearTimeout(simTimer);
+                simTimer = null;
+            }
+
+            // 3. Giải phóng Promise đứng chờ
+            if (ev3DoneResolver) {
+                ev3DoneResolver(false); // Trả về false nghĩa là bị hủy
+                ev3DoneResolver = null;
+            }
+
+            // 4. Reset giao diện các ô nhập số lượng về 0
             document.getElementById('taoTau').value = '0';
             document.getElementById('laHanQua').value = '0';
             document.getElementById('daiTao').value = '0';
 
-            // 2. Reset màu sắc và badge trạng thái của các Trạm
+            // 5. Khôi phục trạng thái ban đầu của các Trạm
             const codes = ['TT', 'LHQ', 'DT'];
             codes.forEach(code => {
                 const item = document.getElementById(`item-${code}`);
@@ -322,17 +339,11 @@
                 badge.style.color = '#495057';
             });
 
-            // 3. Xóa sạch khung Nhật ký (Log)
-            document.getElementById('logBox').innerHTML = '> Đã reset hệ thống. Sẵn sàng...';
+            // 6. Làm sạch Nhật ký Log
+            document.getElementById('logBox').innerHTML = '> Đã RESET hệ thống! Sẵn sàng cho đơn mới...';
 
-            // 4. Mở lại nút gửi lệnh
+            // 7. Mở lại nút gửi lệnh
             document.getElementById('btnSend').disabled = false;
-
-            // 5. Giải phóng Promise đang chờ nếu có
-            if (ev3DoneResolver) {
-                ev3DoneResolver();
-                ev3DoneResolver = null;
-            }
         }
 
         async function connectBluetooth() {
@@ -377,7 +388,7 @@
 
             if (response.includes('DONE') && ev3DoneResolver) {
                 log('✔ Nhận tín hiệu DONE từ EV3. Chuyển trạm tiếp theo!');
-                ev3DoneResolver();
+                ev3DoneResolver(true); // Trả về true: Chạy thành công
                 ev3DoneResolver = null;
             }
         }
@@ -386,13 +397,19 @@
 
         function waitForEV3Done(simTimeoutMs) {
             return new Promise((resolve) => {
+                if (isCancelled) {
+                    resolve(false);
+                    return;
+                }
+
                 if (isConnected) {
                     log('Đang đứng chờ robot EV3 trả về tín hiệu "DONE"...');
                     ev3DoneResolver = resolve;
                 } else {
                     log(`[Mô Phỏng] Đang chờ mô phỏng: ${simTimeoutMs / 1000} giây...`);
-                    setTimeout(() => {
-                        resolve();
+                    simTimer = setTimeout(() => {
+                        simTimer = null;
+                        resolve(true);
                     }, simTimeoutMs);
                 }
             });
@@ -416,6 +433,8 @@
                 return;
             }
 
+            // Đặt lại cờ Hủy trước khi bắt đầu
+            isCancelled = false;
             document.getElementById('btnSend').disabled = true;
 
             let queue = [];
@@ -426,6 +445,9 @@
             log(`=== BẮT ĐẦU CHẠY BĂNG CHUYỀN (${queue.length} Trạm) ===`);
 
             for (let item of queue) {
+                // Kiểm tra nếu bấm Reset thì thoát ngay lập tức khỏi vòng lặp
+                if (isCancelled) break;
+
                 updateStatusUI(item.code, `Đang xả thuốc (${item.qty} viên)...`, 'processing');
                 
                 let msg = `${item.code} ${item.qty}`;
@@ -442,14 +464,25 @@
 
                 let simTimeout = item.qty * 1500; 
 
-                await waitForEV3Done(simTimeout);
+                // Chờ phản hồi hoặc hết giờ mô phỏng
+                let success = await waitForEV3Done(simTimeout);
 
+                // NẾU BỊ HỦY BỞI NÚT RESET: Dừng lập tức, không đổi màu "Đã lấy xong"
+                if (!success || isCancelled) {
+                    log(`⛔ Đã HỦY tiến trình tại Trạm ${item.name}!`);
+                    break;
+                }
+
+                // Cập nhật giao diện nếu chạy thành công
                 updateStatusUI(item.code, `Đã lấy xong (${item.qty} viên)`, 'completed');
                 
                 await sleep(500);
             }
 
-            log(`=== HOÀN THÀNH TOÀN BỘ ĐƠN THUỐC ===`);
+            if (!isCancelled) {
+                log(`=== HOÀN THÀNH TOÀN BỘ ĐƠN THUỐC ===`);
+            }
+            
             document.getElementById('btnSend').disabled = false;
         }
     </script>
